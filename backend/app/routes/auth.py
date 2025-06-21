@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
-from app.settings import *
-from app.security import *
+from core.settings import *
+from core.security import *
 from app.db import get_db
 
 from app.models.user import User

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+.env
+.DS_Store
+
+# Virtual env
+venv/
+
+# VSCode
+.vscode/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Alembic
+alembic/versions/**/__pycache__/
+
+# React
+frontend/.next/
+frontend/.env
+frontend/.cache/

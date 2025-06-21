@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.settings import settings
+from core.settings import settings
 from app.routes import users, auth
 
 app = FastAPI()
