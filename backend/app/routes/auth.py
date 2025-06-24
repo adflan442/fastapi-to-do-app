@@ -5,9 +5,9 @@ from pydantic import BaseModel
 
 from core.settings import *
 from core.security import *
-from app.db import get_db
+from core.db import get_db
 
-from app.models.user import User
+from models.user import User
 
 router = APIRouter()
 

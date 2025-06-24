@@ -1,8 +1,19 @@
 from sqlalchemy.orm import Session
-from app.models.task import Task
-from app.schemas.task import TaskCreate, TaskUpdate
+from models.task import Task
+from schemas.task import TaskCreate, TaskUpdate
 
 def get_task_by_id(db: Session, task_id: int):
+    """
+    Retrieve a task with the given id.
+
+    Parameters:
+    - db: Database Session
+    - task_id: ID of the task
+
+    Returns:
+    - The Task Object with the given task_id
+
+    """
     return db.query(Task).filter(Task.id == task_id).first()
 
 def get_tasks_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
