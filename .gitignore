@@ -20,6 +20,8 @@ build/
 alembic/versions/**/__pycache__/
 
 # React
+frontend/
 frontend/.next/
 frontend/.env
 frontend/.cache/
+

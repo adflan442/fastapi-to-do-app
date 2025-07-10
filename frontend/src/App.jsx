@@ -1,24 +1,42 @@
-import { useEffect, useState } from 'react';
-import DOMPurify from 'dompurify';
+import { useState } from 'react';
 
 function App() {
-  const [data, setData] = useState(null);
+  const [text, setText] = useState('');
+  const [response, setResponse] = useState('');
 
-  useEffect(() => {
-    fetch('http://127.0.0.1:8000/')
-      .then((response) => response.json())
-      .then((data) => setData(data))
-      .catch((error) => console.error('Error fetching data:', error));
-  }, []);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/echo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text })
+      });
+
+      const data = await res.json();
+      setResponse(data.message);
+    } catch (err) {
+      setResponse("Error contacting the API");
+      console.error(err);
+    }
+  };
 
   return (
     <div>
-      <h1>FastAPI + React</h1>
-      <p 
-        dangerouslySetInnerHTML={{
-          __html : data ? DOMPurify.sanitize(data['message']) : 'Loading data...',
-          }}>
-      </p>
+      <h1>Send to FastAPI</h1>
+      <form onSubmit={handleSubmit}>
+        <input 
+          type="text"
+          placeholder="Type something"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <button type="submit">Send</button>
+      </form>
+      {response && <p>{response}</p>}
     </div>
   );
 }
