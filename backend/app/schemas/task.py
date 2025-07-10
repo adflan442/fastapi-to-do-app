@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from enum import Enum
 from typing import Optional
+from datetime import datetime
 
 # Match Enums from the Model
 class TaskStatus(str, Enum):
@@ -21,9 +22,19 @@ class TaskBase(BaseModel):
     status: TaskStatus = TaskStatus.CREATED
     priority: Optional[TaskPriority] = TaskPriority.LOW
 
+# Schema for reading/returning a Task
+class TaskResponse(TaskBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True # Allows SQLAlchemy models to be returned as Pydantic Models
+
 # Schema for creating a task
 class TaskCreate(TaskBase):
-    pass
+    pass # Inherits all TaskBase fields - can update with more later
 
 # Schema for updating a task - all fields optional
 class TaskUpdate(BaseModel):
@@ -32,10 +43,3 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = None
     priority: Optional[TaskPriority] = None
 
-# Schema for reading/returning a Task
-class Task(TaskBase):
-    id: int
-    user_id: int
-
-    class Config:
-        orm_mode = True # Allows SQLAlchemy models to be returned as Pydantic Models

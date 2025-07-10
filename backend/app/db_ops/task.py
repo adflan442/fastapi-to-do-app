@@ -1,120 +1,80 @@
 from sqlalchemy.orm import Session
-from models.task import Task
-from schemas.task import TaskCreate, TaskUpdate
+from app.models.task import Task
+from app.models.user import User
+from app.schemas.task import TaskCreate, TaskUpdate
+from app.core.permissions import *
+from fastapi import HTTPException, status
 
-def get_task_by_id(db: Session, task_id: int):
-    """
-    Retrieve a task with the given id.
+class TaskService:
+    def __init__(self, db: Session):
+        self.db = db
 
-    Parameters:
-    - db: Database Session
-    - task_id: ID of the task
-
-    Returns:
-    - The Task Object with the given task_id
-
-    """
-    return db.query(Task).filter(Task.id == task_id).first()
-
-def get_tasks_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    """
-    Retrieve a paginated list of tasks for a specific user.
-
-    Parameters:
-    - db: Database Session
-    - user_id: ID of the user whose tasks to fetch
-    - skip: Number of tasks to skip (offset) for pagination
-    - limit: Maximum number of tasks to return (default 100)
-
-    Returns:
-    - List of Task objects for the user
-
-    Notes:
-    - `skip` (offset) is used to skip a number of records, useful for pagination.
-    - `limit` caps the number of records returned to avoid overloading responses.
-    """
-    # Query tasks for the user with pagination support
-    return db.query(Task).filter(Task.user_id == user_id).offset(skip).limit(limit).all()
-
-
-def create_task(db: Session, task: TaskCreate, user_id: int):
-    """
-    Create a new task in the database for the given user.
-
-    Parameters:
-    - db: Database Session
-    - task: TaskCreate Pydantic schema with task details
-    - user_id: ID of the user who owns the task
-
-    Returns:
-    - The created Task object
-
-    Notes:
-    - `task.model_dump()` converts the Pydantic model into a dictionary.
-    - The `**` operator unpacks this dictionary into keyword arguments for the SQLAlchemy Task constructor.
-    - This is equivalent to calling:
-      Task(title="...", details="...", status="...", priority="...", user_id=user_id)
-    """
-    db_task = Task(**task.model_dump(), user_id=user_id)
-
-    db.add(db_task)
-    db.commit()
-    db.refresh(db_task)  # Ensure the instance is refreshed with any DB defaults or triggers
-    return db_task
-
-
-def update_task(db: Session, task_id: int, task_update: TaskUpdate):
-    """
-    Update an existing task with new values; only updates fields that are provided by the user.
-
-    Parameters:
-    - db: Database Session
-    - task_id: ID of the task to update
-    - task_update: TaskUpdate Pydantic schema with updated fields (all optional).
-
-    Returns:
-    - The updated Task object, or None if the task can't be found.
-
-    Notes:
-    - `task_update.model_dump(exclude_unset=True)` returns a dictionary of only the fields explicitly set by the user.
-    - Normally, `model_dump()` returns all fields including unset ones with default or None values.
-    - Excluding unset fields avoids overwriting existing data with defaults or None.
-    - The loop with `setattr(db_task, key, value)` dynamically updates attributes on the SQLAlchemy Task instance.
-    """
-    db_task = get_task_by_id(db, task_id)
-    if not db_task:
-        return None
+    def get_task_by_id(self, task_id: int, current_user: User) -> Task:
+        db_task = self.db.query(Task).filter(Task.id == task_id).first()
+        if not db_task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Can't find any task with id - {task_id}"
+            )
+        Permissions.require_admin_or_owner(db_task.user_id, current_user)
+        return db_task
     
-    update_data = task_update.model_dump(exclude_unset=True)
-
-    for key, value in update_data.items():
-        setattr(db_task, key, value)
+    def get_all_tasks(self, current_user: User, skip: int = 0, limit: int = 100) -> list[Task] | None:
+        Permissions.require_admin(current_user)
+        return self.db.query(Task).offset(skip).limit(limit).all()
     
-    db.commit()
-    db.refresh(db_task)  # Refresh to get latest DB state
-    return db_task
+    def get_tasks_by_user(
+        self, 
+        user_id: int, 
+        current_user: User,
+        skip: int = 0, 
+        limit: int = 100
+    ) -> list[Task] | None:
+        
+        Permissions.require_admin_or_owner(user_id, current_user)
+        return (
+            self.db.query(Task)
+            .filter(Task.user_id == user_id)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
-def delete_task(db: Session, task_id: int):
-    """
-    Delete an existing task from the database.
-
-    Parameters: 
-    - db: Database Session
-    - task_id: The ID of the Task to delete
-
-    Returns:
-    - The deleted Task object, or None if the task can't be found.
-
-    Notes:
-    - No need to refresh the deleted task after deletion.
-    - Calling `db.refresh()` after deletion would raise an error or be pointless.
-    - The function returns the task object as it was before deletion.
-    """
-    db_task = get_task_by_id(db, task_id)
-    if not db_task:
-        return None
+    def create_task(self, task: TaskCreate, user_id: int):
+        db_task = Task(**task.model_dump(), user_id=user_id)
+        self.db.add(db_task)
+        self.db.commit()
+        self.db.refresh(db_task)
+        return db_task
     
-    db.delete(db_task)
-    db.commit()
-    return db_task
+    def update_task(self, task_id: int, task_update: TaskUpdate, current_user: User) -> Task | None:
+        db_task = self.get_task_by_id(task_id, current_user)
+
+        if not db_task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="We can't found this task in our system"
+            )
+        
+        Permissions.require_owner(db_task.user_id, current_user)
+        update_data = task_update.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(db_task, key, value)
+        self.db.commit()
+        self.db.refresh(db_task)
+        return db_task
+
+    def delete_task(self, task_id: int, current_user: User) -> Task | None:
+        db_task = self.get_task_by_id(task_id, current_user)
+
+        if not db_task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="We can't found this task in our system"
+            )
+        Permissions.require_admin_or_owner(db_task.user_id, current_user)
+        self.db.delete(db_task)
+        self.db.commit()
+        return db_task
+    
 

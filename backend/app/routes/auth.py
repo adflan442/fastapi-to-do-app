@@ -1,22 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
 
-from core.settings import *
-from core.security import *
-from core.db import get_db
+from app.core.settings import *
+from app.core.security import *
+from app.core.db import get_db
 
-from models.user import User
+from app.db_ops.user import UserService
 
-router = APIRouter()
+from app.models.user import User
+from app.schemas.user import UserRegister, UserRead
+from app.schemas.token import Token
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
+router = APIRouter(
+    prefix="/auth",
+    tags=["auth"]
+)
 
 # Login route (token URL)
-@router.post("/token", response_model=TokenResponse)
+@router.post("/token", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -27,3 +29,22 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         )
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def register(form_data: UserRegister, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Username {user.username} already exists"
+        )
+    user = db.query(User).filter(User.email == form_data.email).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Email {user.email} already exists"
+        )
+    new_user = UserService(db).create_user(form_data)
+    return new_user
+    

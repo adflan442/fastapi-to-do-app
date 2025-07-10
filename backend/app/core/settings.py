@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -11,9 +12,11 @@ class Settings(BaseSettings):
     # __file__ = backend/app/settings.py
     # .parent = backend/app
     # .parent.parent = backend/
-    class Config:
-        env_file = Path(__file__).resolve().parent.parent / ".env"
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[2] / ".env",
         env_file_encoding = 'utf-8'
+    )
+    print("Loading env file from:", (Path(__file__).resolve().parents[2] / ".env"))
 
 
 settings = Settings()
